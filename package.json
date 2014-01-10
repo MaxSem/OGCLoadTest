@@ -1,0 +1,9 @@
+{
+  "name": "OCGLoadTest",
+  "version": "6.6.6",
+  "description": "Fries your Extension:Collection",
+  "license": "WTFPL 2.0",
+  "dependencies": {
+    "request": "*"
+  }
+}
