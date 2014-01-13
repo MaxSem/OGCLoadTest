@@ -43,6 +43,10 @@ function runThread( id ) {
 		get( 'w/api.php', query, callback, true );
 	};
 
+	var isFailedRequest = function( body ) {
+		return body.indexOf( 'coll-request_failed' ) > 0;
+	};
+
 	var testPage = function( title ) {
 		log( 'Attempting to render page ' + title );
 
@@ -52,7 +56,8 @@ function runThread( id ) {
 			title: 'Special:Book',
 			bookcmd: 'render_article',
 			arttitle: title,
-			writer: 'rl'
+			writer: 'rl',
+			uselang: 'qqx'
 		};
 		var doTest = function() {
 			// https://en.wikipedia.org/w/index.php?title=Special:Book&bookcmd=download&collection_id=7d167509c3b51e92&writer=rl&return_to=Operation+Cobra
@@ -65,7 +70,7 @@ function runThread( id ) {
 				'w/index.php',
 				query,
 				function( err, res, body ) {
-					if ( err ) {
+					if ( err || isFailedRequest( body ) ) {
 						stats.errors++;
 						generateRandomPdf();
 					} else if ( body.indexOf( 'bookcmd=download&amp;collection_id' ) > 0 ) {
