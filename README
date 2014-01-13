@@ -1,0 +1,4 @@
+Quick and dirty MediaWiki PDF rendering (load)? test
+
+When run without parameters renders random articles
+When a file name is specified in command line, processes pages from it
