@@ -1,4 +1,5 @@
 var request = require( 'request' );
+var fs = require( 'fs' );
 
 var threads = 10;
 var renderingTimeout = 5 * 60; // 5 minutes
@@ -7,6 +8,17 @@ var stats = {
 	timedOut: 0,
 	errors: 0
 };
+var pageList = null;
+
+var file = process.argv[2];
+if ( file ) {
+	var res = fs.readFileSync( file, { encoding: 'utf8' } );
+	if ( !res ) {
+		console.log( 'Cannot open file ' + file );
+		process.exit( 1 );
+	}
+	pageList = res.split( '\n' );
+}
 
 for ( var i = 0; i < threads; i++ ) {
 	runThread( i );
@@ -50,6 +62,11 @@ function runThread( id ) {
 	var testPage = function( title ) {
 		log( 'Attempting to render page ' + title );
 
+		var matches = title.match( /^((https?:)?\/\/[^\/]+\/)wiki\/(.*)$/ );
+		if ( matches ) {
+			baseUrl = matches[1];
+			title = decodeURIComponent( matches[3] );
+		}
 		var startTime = process.uptime();
 		// https://en.wikipedia.org/w/index.php?title=Special:Book&bookcmd=render_article&arttitle=Operation+Cobra&oldid=581927656&writer=rl
 		var query = {
@@ -64,7 +81,7 @@ function runThread( id ) {
 			if ( process.uptime() - startTime > renderingTimeout ) {
 				log( 'Page ' + title + ' timed out' );
 				stats.timedOut++;
-				generateRandomPdf();
+				nextPage();
 			}
 			get(
 				'w/index.php',
@@ -72,11 +89,11 @@ function runThread( id ) {
 				function( err, res, body ) {
 					if ( err || isFailedRequest( body ) ) {
 						stats.errors++;
-						generateRandomPdf();
+						nextPage();
 					} else if ( body.indexOf( 'bookcmd=download&amp;collection_id' ) > 0 ) {
 						log( 'Download link found, proceeding' );
 						stats.successful++;
-						generateRandomPdf();
+						nextPage();
 					} else {
 						setTimeout( doTest, 2000 );
 					}
@@ -87,7 +104,7 @@ function runThread( id ) {
 		doTest();
 	};
 
-	var generateRandomPdf = function() {
+	var nextRandomPage = function() {
 		log( 'Requesting a random page...' );
 		api(
 			{
@@ -106,12 +123,35 @@ function runThread( id ) {
 						process.exit( 1 );
 					}
 				}
-				generateRandomPdf();
+				nextPage();
 			}
 		);
 	};
 
-	generateRandomPdf();
+	var nextListPage = function() {
+		do {
+			var page = pageList.shift().trim();
+			if ( page.indexOf( '#' ) === 0 ) {
+				page = false;
+			}
+		} while ( !page );
+		if ( page ) {
+			testPage( page );
+		} else {
+			log( 'No more pages' );
+			// End of thread
+		}
+	};
+
+	var nextPage = function() {
+		if ( pageList ) {
+			nextListPage();
+		} else {
+			nextRandomPage();
+		}
+	}
+
+	nextPage();
 }
 
 function reportStats() {
