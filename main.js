@@ -1,18 +1,20 @@
 var request = require( 'request' );
 
 var threads = 10;
+var renderingTimeout = 5 * 60; // 5 minutes
 
 for ( var i = 0; i < threads; i++ ) {
 	runThread( i );
 }
 
 function runThread( id ) {
+	var baseUrl = 'http://en.wikipedia.org/';
+
 	var log = function( msg ) {
 		console.log( '[' + id + '] ' + msg );
 	};
 
 	var get = function( url, query, callback, json ) {
-		var baseUrl = 'http://localhost/';
 		var options = {
 			url: baseUrl + url,
 			qs: query,
@@ -36,8 +38,10 @@ function runThread( id ) {
 		get( 'w/api.php', query, callback, true );
 	};
 
-	var testRandomPage = function( title ) {
+	var testPage = function( title ) {
 		log( 'Attempting to render page ' + title );
+
+		var startTime = process.uptime();
 		// https://en.wikipedia.org/w/index.php?title=Special:Book&bookcmd=render_article&arttitle=Operation+Cobra&oldid=581927656&writer=rl
 		var query = {
 			title: 'Special:Book',
@@ -47,6 +51,10 @@ function runThread( id ) {
 		};
 		var doTest = function() {
 			// https://en.wikipedia.org/w/index.php?title=Special:Book&bookcmd=download&collection_id=7d167509c3b51e92&writer=rl&return_to=Operation+Cobra
+			if ( process.uptime() - startTime > renderingTimeout ) {
+				log( 'Page ' + title + ' timed out' );
+				generateRandomPdf();
+			}
 			get(
 				'w/index.php',
 				query,
@@ -77,9 +85,12 @@ function runThread( id ) {
 			},
 			function( err, res, body ) {
 				if ( !err ) {
-					if ( body.query.random ) {
-						testRandomPage( body.query.random[0].title );
+					if ( body.query && body.query.random ) {
+						testPage( body.query.random[0].title );
 						return;
+					} else {
+						console.log(body);
+						process.exit( 1 );
 					}
 				}
 				generateRandomPdf();
