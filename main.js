@@ -2,6 +2,11 @@ var request = require( 'request' );
 
 var threads = 10;
 var renderingTimeout = 5 * 60; // 5 minutes
+var stats = {
+	successful: 0,
+	timedOut: 0,
+	errors: 0
+};
 
 for ( var i = 0; i < threads; i++ ) {
 	runThread( i );
@@ -53,6 +58,7 @@ function runThread( id ) {
 			// https://en.wikipedia.org/w/index.php?title=Special:Book&bookcmd=download&collection_id=7d167509c3b51e92&writer=rl&return_to=Operation+Cobra
 			if ( process.uptime() - startTime > renderingTimeout ) {
 				log( 'Page ' + title + ' timed out' );
+				stats.timedOut++;
 				generateRandomPdf();
 			}
 			get(
@@ -60,9 +66,11 @@ function runThread( id ) {
 				query,
 				function( err, res, body ) {
 					if ( err ) {
+						stats.errors++;
 						generateRandomPdf();
 					} else if ( body.indexOf( 'bookcmd=download&amp;collection_id' ) > 0 ) {
 						log( 'Download link found, proceeding' );
+						stats.successful++;
 						generateRandomPdf();
 					} else {
 						setTimeout( doTest, 2000 );
@@ -100,3 +108,16 @@ function runThread( id ) {
 
 	generateRandomPdf();
 }
+
+function reportStats() {
+	if ( stats ) { // Prevent multiple invocation
+		console.log( 'Statistics:' );
+		console.log( stats );
+		stats = null;
+		process.exit();
+	}
+}
+
+process.on( 'exit', reportStats );
+process.on( 'SIGINT', reportStats );
+process.on( 'uncaughtException', reportStats );
